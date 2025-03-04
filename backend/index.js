@@ -1,6 +1,7 @@
 const connectToMongo = require('./db');
 const express = require('express');
 const cors = require('cors');
+require("dotenv").config({ path: "./key.env" }); // Load env first
 
 const corsOptions = {
   origin: "http://localhost:3000", // Allow frontend

@@ -1,18 +1,22 @@
-const express = require("express");
-const router = express.Router();
-const fetchUser = require("../middleware/fetchUser");
-const User = require("../models/User");
+const jwt = require("jsonwebtoken");
+require("dotenv").config(); // Load environment variables
 
-// Route to get logged-in user's details
-router.get("/getuser", fetchUser, async (req, res) => {
-    try {
-        const userId = req.user.id;
-        const user = await User.findById(userId).select("-password"); // Exclude password
-        res.json(user);
-    } catch (error) {
-        console.error("Error fetching user:", error);
-        res.status(500).send("Internal Server Error");
+const JWT_SECRET = process.env.JWT_SECRET; // Read secret key from .env
+
+const fetchUser = (req, res, next) => {
+    // Get the user from the JWT token and add id to req object
+    const token = req.header("auth-token");
+    if (!token) {
+        return res.status(401).json({ error: "Please authenticate using a valid token" });
     }
-});
 
-module.exports = router;
+    try {
+        const data = jwt.verify(token, JWT_SECRET);
+        req.user = data.user; // Store user data in request
+        next();
+    } catch (error) {
+        res.status(401).json({ error: "Invalid token" });
+    }
+};
+
+module.exports = fetchUser;

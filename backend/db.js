@@ -1,6 +1,7 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
+require("dotenv").config({ path: "./key.env" });
 
-const mongoURI = "mongodb://127.0.0.1:27017/inotebook";  // Use 127.0.0.1 instead of localhost
+const mongoURI = process.env.MONGO_URI; // Load from env
 
 const connectToMongo = async () => {
     try {
@@ -8,11 +9,12 @@ const connectToMongo = async () => {
             useNewUrlParser: true,
             useUnifiedTopology: true
         });
-        console.log("Connected to MongoDB successfully");
+        console.log("Connected to MongoDB successfully!");
     } catch (error) {
-        console.error("Error connecting to MongoDB:", error.message);
-        process.exit(1); // Exit the process if the database connection fails
+        console.error("MongoDB connection failed:", error);
+        process.exit(1); // Exit if connection fails
     }
 };
 
+// Export connection function
 module.exports = connectToMongo;

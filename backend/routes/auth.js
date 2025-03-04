@@ -4,7 +4,7 @@ const router = express.Router();
 const { body, validationResult } = require('express-validator');
 const bcrypt = require('bcryptjs');
 var jwt = require('jsonwebtoken');
-var fetchuser = require('../middleware/fetchUser');
+var fetchUser = require('../middleware/fetchUser');
 const cors = require('cors');
 
 const JWT_SECRET = 'Harryisagoodb$oy';
@@ -108,13 +108,14 @@ router.post('/logout', (req, res) => {
 });
 
 // ROUTE 4: Get Logged-in User
-router.get('/getuser', fetchuser, async (req, res) => {
+router.get("/getuser", fetchuser, async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).select("-password");
-    res.json(user);
+      const userId = req.user.id; // Extract user ID from token
+      const user = await User.findById(userId).select("name email"); // Fetch user
+      res.json(user);
   } catch (error) {
-    console.error(error.message);
-    res.status(500).send("Internal Server Error");
+      console.error("Error fetching user:", error.message);
+      res.status(500).send("Internal Server Error");
   }
 });
 
