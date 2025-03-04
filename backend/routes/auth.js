@@ -4,61 +4,67 @@ const router = express.Router();
 const { body, validationResult } = require('express-validator');
 const bcrypt = require('bcryptjs');
 var jwt = require('jsonwebtoken');
-var fetchuser = require('../middleware/fetchuser');
+var fetchuser = require('../middleware/fetchUser');
+const cors = require('cors');
 
 const JWT_SECRET = 'Harryisagoodb$oy';
 
-// ROUTE 1: Create a User using: POST "/api/auth/createuser". No login required
+// Allow cookies to be set from frontend
+router.use(cors({ credentials: true, origin: 'http://localhost:3000' })); 
+
+// Middleware to parse cookies
+const cookieParser = require('cookie-parser');
+router.use(cookieParser());
+
+// ROUTE 1: Create a User
 router.post('/createuser', [
   body('name', 'Enter a valid name').isLength({ min: 3 }),
   body('email', 'Enter a valid email').isEmail(),
   body('password', 'Password must be atleast 5 characters').isLength({ min: 5 }),
 ], async (req, res) => {
-  // If there are errors, return Bad request and the errors
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(400).json({ errors: errors.array() });
   }
   try {
-    // Check whether the user with this email exists already
     let user = await User.findOne({ email: req.body.email });
     if (user) {
-      return res.status(400).json({ error: "Sorry a user with this email already exists" })
+      return res.status(400).json({ error: "User already exists" });
     }
+
     const salt = await bcrypt.genSalt(10);
     const secPass = await bcrypt.hash(req.body.password, salt);
 
-    // Create a new user
     user = await User.create({
       name: req.body.name,
       password: secPass,
       email: req.body.email,
     });
-    const data = {
-      user: {
-        id: user.id
-      }
-    }
-    const authtoken = jwt.sign(data, JWT_SECRET);
 
+    const data = { user: { id: user.id } };
+    const authtoken = jwt.sign(data, JWT_SECRET, { expiresIn: "1h" });
 
-    // res.json(user)
-    res.json({ authtoken })
+    // Send token as an HTTP-only cookie
+    res.cookie("token", authtoken, {
+      httpOnly: true,
+      secure: false, // Set to true in production (only for HTTPS)
+      sameSite: "Strict",
+      maxAge: 3600000, // 1 hour
+    });
+
+    res.json({ success: true, user: { name: user.name, email: user.email } });
 
   } catch (error) {
     console.error(error.message);
     res.status(500).send("Internal Server Error");
   }
-})
+});
 
-
-// ROUTE 2: Authenticate a User using: POST "/api/auth/login". No login required
+// ROUTE 2: Login User and Set Cookie
 router.post('/login', [
   body('email', 'Enter a valid email').isEmail(),
   body('password', 'Password cannot be blank').exists(),
 ], async (req, res) => {
-  let success = false;
-  // If there are errors, return Bad request and the errors
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(400).json({ errors: errors.array() });
@@ -68,44 +74,48 @@ router.post('/login', [
   try {
     let user = await User.findOne({ email });
     if (!user) {
-      success = false
-      return res.status(400).json({ error: "Please try to login with correct credentials" });
+      return res.status(400).json({ error: "Invalid credentials" });
     }
 
     const passwordCompare = await bcrypt.compare(password, user.password);
     if (!passwordCompare) {
-      success = false
-      return res.status(400).json({ success, error: "Please try to login with correct credentials" });
+      return res.status(400).json({ error: "Invalid credentials" });
     }
 
-    const data = {
-      user: {
-        id: user.id
-      }
-    }
-    const authtoken = jwt.sign(data, JWT_SECRET);
-    success = true;
-    res.json({ success, authtoken })
+    const data = { user: { id: user.id } };
+    const authtoken = jwt.sign(data, JWT_SECRET, { expiresIn: "1h" });
+
+    // Send token as a cookie
+    res.cookie("token", authtoken, {
+      httpOnly: true,
+      secure: false,
+      sameSite: "Strict",
+      maxAge: 3600000,
+    });
+
+    res.json({ success: true, user: { name: user.name, email: user.email } });
 
   } catch (error) {
     console.error(error.message);
     res.status(500).send("Internal Server Error");
   }
-
-
 });
 
+// ROUTE 3: Logout User (Clear Cookie)
+router.post('/logout', (req, res) => {
+  res.clearCookie("token");
+  res.json({ success: true, message: "Logged out successfully" });
+});
 
-// ROUTE 3: Get loggedin User Details using: POST "/api/auth/getuser". Login required
-router.post('/getuser', fetchuser,  async (req, res) => {
-
+// ROUTE 4: Get Logged-in User
+router.get('/getuser', fetchuser, async (req, res) => {
   try {
-    userId = req.user.id;
-    const user = await User.findById(userId).select("-password")
-    res.send(user)
+    const user = await User.findById(req.user.id).select("-password");
+    res.json(user);
   } catch (error) {
     console.error(error.message);
     res.status(500).send("Internal Server Error");
   }
-})
-module.exports = router
+});
+
+module.exports = router;

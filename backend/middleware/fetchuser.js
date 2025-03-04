@@ -1,21 +1,18 @@
-var jwt = require('jsonwebtoken');
-const JWT_SECRET = 'Harryisagoodb$oy';
+const express = require("express");
+const router = express.Router();
+const fetchUser = require("../middleware/fetchUser");
+const User = require("../models/User");
 
-const fetchuser = (req, res, next) => {
-    // Get the user from the jwt token and add id to req object
-    const token = req.header('auth-token');
-    if (!token) {
-        res.status(401).send({ error: "Please authenticate using a valid token" })
-    }
+// Route to get logged-in user's details
+router.get("/getuser", fetchUser, async (req, res) => {
     try {
-        const data = jwt.verify(token, JWT_SECRET);
-        req.user = data.user;
-        next();
+        const userId = req.user.id;
+        const user = await User.findById(userId).select("-password"); // Exclude password
+        res.json(user);
     } catch (error) {
-        res.status(401).send({ error: "Please authenticate using a valid token" })
+        console.error("Error fetching user:", error);
+        res.status(500).send("Internal Server Error");
     }
+});
 
-}
-
-
-module.exports = fetchuser;
+module.exports = router;
